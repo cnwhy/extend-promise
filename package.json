@@ -1,0 +1,25 @@
+{
+  "name": "extend-promise",
+  "version": "0.0.1",
+  "description": "基于promise扩展一些常用方法",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cnwhy/extend-promise.git"
+  },
+  "keywords": [
+    "promise"
+  ],
+  "author": {
+    "name": "cnwhy",
+    "email": "w.why@163.com"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cnwhy/extend-promise/issues"
+  },
+  "homepage": "https://github.com/cnwhy/extend-promise#readme"
+}
