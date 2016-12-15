@@ -1,6 +1,6 @@
 {
   "name": "extend-promise",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "基于promise扩展一些常用方法",
   "main": "index.js",
   "scripts": {
@@ -17,9 +17,22 @@
     "name": "cnwhy",
     "email": "w.why@163.com"
   },
-  "license": "ISC",
+  "license": "BSD",
   "bugs": {
     "url": "https://github.com/cnwhy/extend-promise/issues"
   },
-  "homepage": "https://github.com/cnwhy/extend-promise#readme"
+  "homepage": "https://github.com/cnwhy/extend-promise#readme",
+  "devDependencies": {
+    "gulp": "^3.9.1",
+    "gulp-browserify": "^0.5.1",
+    "gulp-header": "^1.8.8",
+    "gulp-mocha": "^3.0.1",
+    "gulp-rename": "^1.2.2",
+    "gulp-uglify": "^2.0.0",
+    "istanbul": "^0.4.5",
+    "mocha": "^3.2.0"
+  },
+  "dependencies": {
+    "easy-promise": "0.0.1"
+  }
 }
