@@ -23,7 +23,7 @@ function extendPrototype(Promise){
 	 * @param  {Function} fn      处理函数,拒绝值做为参数传入
 	 * @return {Promise}           
 	 */
-	Prototype.catchOf = function(errType,fn){
+	prototype.catchOf = function(errType,fn){
 		fn = fn || errType;
 		return this.then(null,function(err){
 			var futype = typeof fn;

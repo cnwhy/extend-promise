@@ -1,7 +1,7 @@
 /*!
- * extend-promise v0.0.2
+ * extend-promise v0.0.3
  * Homepage https://github.com/cnwhy/extend-promise#readme
- * License BSD
+ * License BSD-2-Clause
  */
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 (function (name, factory) {
@@ -21,13 +21,12 @@
 module.exports = require("./src")(function(fn){setTimeout(fn,0)});
 },{"./src":3}],3:[function(require,module,exports){
 "use strict";
-//参考官方代码示例改动
 module.exports = function(nextTick){
+	var FUN = function(){};
 	function Resolve(promise, x) {
-		if(x instanceof Promise_){
+		if(isPromise(x)){
 			x.then(promise.resolve,promise.reject)
-		};
-		if (x && (typeof x === 'function' || typeof x === 'object')) {
+		}else if (x && (typeof x === 'function' || typeof x === 'object')) {
 			var called = false,then;
 			try {
 				then = x.then;
@@ -55,36 +54,49 @@ module.exports = function(nextTick){
 		}
 	}
 
+	function isPromise(obj){
+		return obj instanceof Promise_;
+	}
+
+	function bind(fun,self){
+		var arg = Array.prototype.slice.call(arguments,2);
+		return function(){
+			fun.apply(self,arg.concat(Array.prototype.slice.call(arguments)));
+		}
+	}
+
 	function Promise_(fun){
 		//var defer = this.defer = new Defer(this);
 		var self = this;
 		this.status = -1;  //pending:-1 ; fulfilled:1 ; rejected:0
 		this._events = [];
 		var lock = false;
+
 		function _resolve(value){
 			changeStatus.call(self,1,value)
 		}
 		function _reject(reason){
 			changeStatus.call(self,0,reason)
 		}
-		this.resolve = function(value){
+
+		function resolve(value){
 			if(lock) return;
 			lock = true;
 			if(self === value){
 				return _reject(new TypeError("The promise and its value refer to the same object"));
 			} 
-			// if(value instanceof Promise_){
-			// 	value.then(_resolve,_reject)
-			// }else{
 			Resolve({resolve:_resolve,reject:_reject},value)
-			//}
 		}
-		this.reject = function(reason){
+		function reject(reason){
 			if(lock) return;
 			lock = true;
 			_reject(reason);
 		}
-		if(typeof fun == "function"){
+
+		this.resolve = resolve;
+		this.reject = reject;
+		
+		if(fun !== FUN && typeof fun == "function"){
 			try{
 				fun(this.resolve,this.reject);
 			}catch(e){
@@ -94,20 +106,16 @@ module.exports = function(nextTick){
 	}
 
 	Promise_.defer = function(){
-		var _resolve,_reject;
-		var _promise = new Promise_(function(ok,no){
-			_resolve = ok;
-			_reject = no;
-		});
+		var _promise = new Promise_(FUN);
 		return {
 			promise: _promise,
-			resolve: _resolve,
-			reject: _reject
+			resolve: _promise.resolve,
+			reject: _promise.reject
 		}
 	}
 
 	Promise_.resolve = function(obj){
-		if(obj instanceof Promise_) return obj;
+		if(isPromise(obj)) return obj;
 		return new Promise_(function(ok,no){
 			ok(obj);
 		})
@@ -119,24 +127,28 @@ module.exports = function(nextTick){
 		})
 	}
 
+	Promise.prototype.toString = function () {
+	    return "[object Promise]";
+	}
+
 	Promise_.prototype.then = function(ok,no){
 		var status = this.status;
 		var defer = Promise_.defer()
 			,promise = defer.promise
 			
-		// if(!~status){
-		//  this.events.push([ok,no,promise]);
-		// }else if(status && typeof ok == "function"){
-		//  runThen(ok,this.value,promise,status);
-		// }else if(!status && typeof no == "function"){
-		//  runThen(no,this.reason,promise,status)
-		// }else{
-		//  if(status) defer.resolve(this.value)
-		//  else defer.reject(this.reason);
-		// }
+		if(!~status){
+			this._events.push([ok,no,promise]);
+		}else if(status && typeof ok == "function"){
+			runThen(ok,this.value,promise,status);
+		}else if(!status && typeof no == "function"){
+			runThen(no,this.reason,promise,status)
+		}else{
+			if(status) defer.resolve(this.value)
+			else defer.reject(this.reason);
+		}
 
-		this._events.push([ok,no,promise]);
-		runThens.call(this)
+		// this._events.push([ok,no,promise]);
+		// runThens.call(this)
 		return promise;
 	}
 
@@ -149,9 +161,7 @@ module.exports = function(nextTick){
 		}else{
 			this.reason = arg;
 		}
-		nextTick(function(){
-			runThens.call(self)
-		})
+		runThens.call(self)
 	}
 
 	function runThens(){
@@ -160,35 +170,40 @@ module.exports = function(nextTick){
 			,_event = self._events
 			,arg = self.status ? self.value : self.reason
 			,FnNumb = self.status ? 0 : 1;
-		while(_event.length){
+		//while(_event.length){
+		for(var i=0; i<_event.length; i++){
 			(function(eArr){
 				var resolve,reject
 				var fn = eArr[FnNumb]
 					,nextQ = eArr[2]
 				runThen(fn,arg,nextQ,self.status);
-			})(_event.shift())
+			})(_event[i])
+			// })(_event.shift())
 		}
+		_event = [];
 	}
 
 	function runThen(fn,arg,nextQ,status){
-		var resolve,reject
-		if(nextQ){
-			resolve = nextQ.resolve
-			reject = nextQ.reject 
-		}
+		var resolve = nextQ.resolve
+			,reject = nextQ.reject
+		// if(nextQ){
+		// 	resolve = nextQ.resolve
+		// 	reject = nextQ.reject 
+		// }
 		if(typeof fn == 'function'){
 			nextTick(function(){
 				var nextPromise;
 				try{
 					nextPromise = fn(arg)
 				}catch(e){
-					if(reject) reject(e)
-					else throw e;
+					reject(e)
+					// if(reject) 
+					// else throw e;
 					return;
 				}
-				if(resolve) resolve(nextPromise);
+				resolve(nextPromise);
 			})
-		}else if(nextQ){
+		}else{
 			if (status) resolve(arg)
 			else reject(arg)
 		}
@@ -199,29 +214,46 @@ module.exports = function(nextTick){
 var Promise = require('easy-promise/setTimeout');
 module.exports = require('../src/polyfills')(Promise);
 },{"../src/polyfills":7,"easy-promise/setTimeout":2}],5:[function(require,module,exports){
-function isPlainObject(obj) {
-	if (obj === null || typeof(obj) !== "object" || obj.nodeType || (obj === obj.window)) {
-		return false;
-	}
-	if (obj.constructor && !Object.prototype.hasOwnProperty.call(obj.constructor.prototype, "isPrototypeOf")) {
-		return false;
-	}
-	return true;
-}
-function extendClass(Promise,obj){
-	var QClass;
+'use strict';
+var utils = require('./utils')
+var isArray = utils.isArray
+	,isEmpty = utils.isEmpty
+	,isFunction = utils.isFunction
+	,isPlainObject = utils.isPlainObject
+	,arg2arr = utils.arg2arr
+
+function extendClass(Promise,obj,funnames){
+	var QClass,source;
 	if(obj){
+		source = true
 		QClass = obj;
 	}else{
 		QClass = Promise;
 	}
 
+	function asbind(name){
+		if(isArray(funnames)){
+			var nomark = false;
+			for(var i = 0; i<funnames.length; i++){
+				if(funnames[i] == name){
+					nomark = true;
+					break;
+				}
+			}
+			if(!nomark) return false;
+		}
+		if(source){
+			return !isFunction(QClass[name]);
+		}
+		return true;
+	}
+
 	if(!QClass.Promise && Promise != obj) QClass.Promise = Promise;
 
 	//defer
-	if(typeof Promise.defer == "function"){
+	if(isFunction(Promise.defer)){
 		QClass.defer = Promise.defer
-	}else if(typeof Promise.deferred == "function"){
+	}else if(isFunction(Promise.deferred)){
 		QClass.defer = Promise.deferred
 	}else{
 		QClass.defer = function() {
@@ -239,9 +271,7 @@ function extendClass(Promise,obj){
 	}
 
 	//delay
-	if(typeof Promise.delay == "function"){
-		QClass.delay = Promise.delay;
-	}else{
+	if(asbind("delay")){
 		QClass.delay = function(ms,value){
 			var defer = QClass.defer();
 			setTimeout(defer.resolve,ms,value)
@@ -250,9 +280,7 @@ function extendClass(Promise,obj){
 	}
 
 	//resolve
-	if(typeof Promise.resolve == "function"){
-		QClass.resolve = Promise.resolve;
-	}else{
+	if(asbind("resolve")){
 		QClass.resolve = function(obj){
 			var defer = QClass.defer();
 			defer.resolve(obj);
@@ -261,9 +289,7 @@ function extendClass(Promise,obj){
 	}
 
 	//reject
-	if(typeof Promise.reject == "function"){
-		QClass.reject = Promise.reject;
-	}else{
+	if(asbind("reject")){
 		QClass.reject = function(obj){
 			var defer = QClass.defer();
 			defer.reject(obj);
@@ -272,19 +298,21 @@ function extendClass(Promise,obj){
 	}
 
 	function getall(map,count){
-		count = +count > 0 ? +count : 0; 
+		if(!isEmpty(count)){
+			count = +count > 0 ? +count : 0; 
+		}
 		return function(promises) {
 			var defer = QClass.defer();
 			var data,_tempI = 0;
 			var fillData = function(i){
 				var _p = promises[i]
 				QClass.resolve(_p).then(function(d) {
-					if(map || !count (count && data.length<count)) data[i] = d;
+					data[i] = d;
 					if (--_tempI == 0 || (!map && count && data.length>=count)) {
 						defer.resolve(data);
 					}
 				}, function(err) {
-					if (typeof count == "undefined") {
+					if (isEmpty(count)) {
 						defer.reject(err);
 					}else if(--_tempI == 0){
 						defer.resolve(data);
@@ -292,7 +320,7 @@ function extendClass(Promise,obj){
 				})
 				_tempI++;
 			}
-			if(Object.prototype.toString.call(promises) === '[object Array]'){
+			if(isArray(promises)){
 				data = [];
 				for(var i = 0; i<promises.length; i++){
 					fillData(i);
@@ -310,26 +338,22 @@ function extendClass(Promise,obj){
 	}
 
 	//all 
-	if(typeof Promise.all == "function"){
-		QClass.all = Promise.all;
-	}else{
+	if(asbind("all")){
 		QClass.all = getall()
 	}
 
-	if (typeof Promise.allMap == "function") {
-		QClass.allMap = Promise.allMap;
-	} else {
+	if(asbind("allMap")){
 		QClass.allMap = getall(true);
 	}
 
-	QClass.some = function(proArr,count){
-		return getall(false,count||0)(proArr)
+	if(asbind("some")){
+		QClass.some = function(proArr,count){
+			return getall(false,count||0)(proArr)
+		}
 	}
 
 	//map
-	if(typeof Promise.map == "function"){
-		QClass.map = Promise.map;
-	}else{
+	if(asbind("map")){
 		QClass.map = function(data,mapfun,options){
 			var defer = QClass.defer();
 			var promiseArr = [];
@@ -372,29 +396,30 @@ function extendClass(Promise,obj){
 		}
 	}
 
-	//any | race
-	if(typeof Promise.race == "function"){
-		QClass.race = QClass.any = Promise.race;
-	}else if(typeof Promise.any == "function"){
-		QClass.race = QClass.any = Promise.any
-	}else{
-		QClass.race = QClass.any = function(proArr) {
-			var defer = QClass.defer();
-			for (var i = 0; i < proArr.length; i++) {
-				+ function() {
-					var _i = i;
-					//nextTick(function() {
-						var _p = proArr[_i];
-						QClass.resolve(_p).then(function(data) {
-							defer.resolve(data);
-						}, function(err) {
-							defer.reject(err);
-						})
-					//}, 0)
-				}()
-			}
-			return defer.promise;
+	function race(proArr) {
+		var defer = QClass.defer();
+		for (var i = 0; i < proArr.length; i++) {
+			+ function() {
+				var _i = i;
+				//nextTick(function() {
+					var _p = proArr[_i];
+					QClass.resolve(_p).then(function(data) {
+						defer.resolve(data);
+					}, function(err) {
+						defer.reject(err);
+					})
+				//}, 0)
+			}()
 		}
+		return defer.promise;
+	}
+
+	//any | race
+	if(asbind("race")){
+		QClass.race = race;
+	}
+	if(asbind("any")){
+		QClass.any = race;
 	}
 
 	/*封装CPS*/
@@ -405,37 +430,43 @@ function extendClass(Promise,obj){
 			defer.resolve(data)
 		}
 	}
-	QClass.nfcall = function(f){
+	function nfcall(f){
 		var _this = this === QClass ? null : this;
 		var defer = QClass.defer();
-		var argsArray = Array.prototype.slice.call(arguments,1)
+		var argsArray = arg2arr(arguments,1)
 		argsArray.push(cbAdapter(defer))
 		f.apply(_this,argsArray)
-		return defer.promise;
 	}
 
-	QClass.nfapply = function(f,args){
-		var _this = this === QClass ? null : this;
-		var defer = QClass.defer();
-		if(Object.prototype.toString.call(args) === '[object Array]'){
-			args.push(cbAdapter(defer));
-			f.apply(_this,args)
-		}else{
-			throw "args TypeError"
+
+	if(asbind("nfcall")){
+		QClass.nfcall = nfcall;
+	}
+
+	if(asbind("nfapply")){
+		QClass.nfapply = function(f,args){
+			var _this = this === QClass ? null : this;
+			var defer = QClass.defer();
+			if(isArray(args)){
+				args.push(cbAdapter(defer));
+				f.apply(_this,args)
+			}else{
+				throw "args TypeError"
+			}
+			return defer.promise;
 		}
-		return defer.promise;
 	}
 
 	QClass.denodeify = function(f){
 		var _this = this === QClass ? null : this;
 		return function(){
-			return QClass.nfapply.call(_this,f,Array.prototype.slice.call(arguments))
+			return nfcall.call(_this,f,arg2arr(arguments))
 		}
 	}
 	return QClass;
 }
 module.exports = extendClass;
-},{}],6:[function(require,module,exports){
+},{"./utils":8}],6:[function(require,module,exports){
 function extendPrototype(Promise){
 	var prototype = Promise.prototype;
 	prototype.done = function(ok,no){
@@ -461,7 +492,7 @@ function extendPrototype(Promise){
 	 * @param  {Function} fn      处理函数,拒绝值做为参数传入
 	 * @return {Promise}           
 	 */
-	Prototype.catchOf = function(errType,fn){
+	prototype.catchOf = function(errType,fn){
 		fn = fn || errType;
 		return this.then(null,function(err){
 			var futype = typeof fn;
@@ -504,4 +535,31 @@ module.exports = function(Promise){
 	require("../src/extendPrototype")(Promise)
 	return(Promise)
 }
-},{"../src/extendClass":5,"../src/extendPrototype":6}]},{},[1])
+},{"../src/extendClass":5,"../src/extendPrototype":6}],8:[function(require,module,exports){
+'use strict';
+exports.isPlainObject = function(obj) {
+	if (obj === null || typeof(obj) !== "object" || obj.nodeType || (obj === obj.window)) {
+		return false;
+	}
+	if (obj.constructor && !Object.prototype.hasOwnProperty.call(obj.constructor.prototype, "isPrototypeOf")) {
+		return false;
+	}
+	return true;
+}
+
+exports.isArray = function(obj){
+	return Object.prototype.toString.call(obj) == "[objece Array]"
+}
+
+exports.isFunction = function(obj){
+	return typeof obj == "function"
+}
+
+exports.isEmpty = function(obj){
+	return typeof obj == 'undefined' || obj === null;
+}
+
+exports.arg2arr = function(arg,b,s){
+	return Array.prototype.slice.call(arg,b,s);
+}
+},{}]},{},[1])

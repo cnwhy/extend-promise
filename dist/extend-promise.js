@@ -1,7 +1,7 @@
 /*!
- * extend-promise v0.0.2
+ * extend-promise v0.0.3
  * Homepage https://github.com/cnwhy/extend-promise#readme
- * License BSD
+ * License BSD-2-Clause
  */
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 (function (name, factory) {
@@ -30,29 +30,46 @@ module.exports = {
 	extendPrototype : require("./src/extendPrototype")
 };
 },{"./src/extendClass":3,"./src/extendPrototype":4}],3:[function(require,module,exports){
-function isPlainObject(obj) {
-	if (obj === null || typeof(obj) !== "object" || obj.nodeType || (obj === obj.window)) {
-		return false;
-	}
-	if (obj.constructor && !Object.prototype.hasOwnProperty.call(obj.constructor.prototype, "isPrototypeOf")) {
-		return false;
-	}
-	return true;
-}
-function extendClass(Promise,obj){
-	var QClass;
+'use strict';
+var utils = require('./utils')
+var isArray = utils.isArray
+	,isEmpty = utils.isEmpty
+	,isFunction = utils.isFunction
+	,isPlainObject = utils.isPlainObject
+	,arg2arr = utils.arg2arr
+
+function extendClass(Promise,obj,funnames){
+	var QClass,source;
 	if(obj){
+		source = true
 		QClass = obj;
 	}else{
 		QClass = Promise;
 	}
 
+	function asbind(name){
+		if(isArray(funnames)){
+			var nomark = false;
+			for(var i = 0; i<funnames.length; i++){
+				if(funnames[i] == name){
+					nomark = true;
+					break;
+				}
+			}
+			if(!nomark) return false;
+		}
+		if(source){
+			return !isFunction(QClass[name]);
+		}
+		return true;
+	}
+
 	if(!QClass.Promise && Promise != obj) QClass.Promise = Promise;
 
 	//defer
-	if(typeof Promise.defer == "function"){
+	if(isFunction(Promise.defer)){
 		QClass.defer = Promise.defer
-	}else if(typeof Promise.deferred == "function"){
+	}else if(isFunction(Promise.deferred)){
 		QClass.defer = Promise.deferred
 	}else{
 		QClass.defer = function() {
@@ -70,9 +87,7 @@ function extendClass(Promise,obj){
 	}
 
 	//delay
-	if(typeof Promise.delay == "function"){
-		QClass.delay = Promise.delay;
-	}else{
+	if(asbind("delay")){
 		QClass.delay = function(ms,value){
 			var defer = QClass.defer();
 			setTimeout(defer.resolve,ms,value)
@@ -81,9 +96,7 @@ function extendClass(Promise,obj){
 	}
 
 	//resolve
-	if(typeof Promise.resolve == "function"){
-		QClass.resolve = Promise.resolve;
-	}else{
+	if(asbind("resolve")){
 		QClass.resolve = function(obj){
 			var defer = QClass.defer();
 			defer.resolve(obj);
@@ -92,9 +105,7 @@ function extendClass(Promise,obj){
 	}
 
 	//reject
-	if(typeof Promise.reject == "function"){
-		QClass.reject = Promise.reject;
-	}else{
+	if(asbind("reject")){
 		QClass.reject = function(obj){
 			var defer = QClass.defer();
 			defer.reject(obj);
@@ -103,19 +114,21 @@ function extendClass(Promise,obj){
 	}
 
 	function getall(map,count){
-		count = +count > 0 ? +count : 0; 
+		if(!isEmpty(count)){
+			count = +count > 0 ? +count : 0; 
+		}
 		return function(promises) {
 			var defer = QClass.defer();
 			var data,_tempI = 0;
 			var fillData = function(i){
 				var _p = promises[i]
 				QClass.resolve(_p).then(function(d) {
-					if(map || !count (count && data.length<count)) data[i] = d;
+					data[i] = d;
 					if (--_tempI == 0 || (!map && count && data.length>=count)) {
 						defer.resolve(data);
 					}
 				}, function(err) {
-					if (typeof count == "undefined") {
+					if (isEmpty(count)) {
 						defer.reject(err);
 					}else if(--_tempI == 0){
 						defer.resolve(data);
@@ -123,7 +136,7 @@ function extendClass(Promise,obj){
 				})
 				_tempI++;
 			}
-			if(Object.prototype.toString.call(promises) === '[object Array]'){
+			if(isArray(promises)){
 				data = [];
 				for(var i = 0; i<promises.length; i++){
 					fillData(i);
@@ -141,26 +154,22 @@ function extendClass(Promise,obj){
 	}
 
 	//all 
-	if(typeof Promise.all == "function"){
-		QClass.all = Promise.all;
-	}else{
+	if(asbind("all")){
 		QClass.all = getall()
 	}
 
-	if (typeof Promise.allMap == "function") {
-		QClass.allMap = Promise.allMap;
-	} else {
+	if(asbind("allMap")){
 		QClass.allMap = getall(true);
 	}
 
-	QClass.some = function(proArr,count){
-		return getall(false,count||0)(proArr)
+	if(asbind("some")){
+		QClass.some = function(proArr,count){
+			return getall(false,count||0)(proArr)
+		}
 	}
 
 	//map
-	if(typeof Promise.map == "function"){
-		QClass.map = Promise.map;
-	}else{
+	if(asbind("map")){
 		QClass.map = function(data,mapfun,options){
 			var defer = QClass.defer();
 			var promiseArr = [];
@@ -203,29 +212,30 @@ function extendClass(Promise,obj){
 		}
 	}
 
-	//any | race
-	if(typeof Promise.race == "function"){
-		QClass.race = QClass.any = Promise.race;
-	}else if(typeof Promise.any == "function"){
-		QClass.race = QClass.any = Promise.any
-	}else{
-		QClass.race = QClass.any = function(proArr) {
-			var defer = QClass.defer();
-			for (var i = 0; i < proArr.length; i++) {
-				+ function() {
-					var _i = i;
-					//nextTick(function() {
-						var _p = proArr[_i];
-						QClass.resolve(_p).then(function(data) {
-							defer.resolve(data);
-						}, function(err) {
-							defer.reject(err);
-						})
-					//}, 0)
-				}()
-			}
-			return defer.promise;
+	function race(proArr) {
+		var defer = QClass.defer();
+		for (var i = 0; i < proArr.length; i++) {
+			+ function() {
+				var _i = i;
+				//nextTick(function() {
+					var _p = proArr[_i];
+					QClass.resolve(_p).then(function(data) {
+						defer.resolve(data);
+					}, function(err) {
+						defer.reject(err);
+					})
+				//}, 0)
+			}()
 		}
+		return defer.promise;
+	}
+
+	//any | race
+	if(asbind("race")){
+		QClass.race = race;
+	}
+	if(asbind("any")){
+		QClass.any = race;
 	}
 
 	/*封装CPS*/
@@ -236,37 +246,43 @@ function extendClass(Promise,obj){
 			defer.resolve(data)
 		}
 	}
-	QClass.nfcall = function(f){
+	function nfcall(f){
 		var _this = this === QClass ? null : this;
 		var defer = QClass.defer();
-		var argsArray = Array.prototype.slice.call(arguments,1)
+		var argsArray = arg2arr(arguments,1)
 		argsArray.push(cbAdapter(defer))
 		f.apply(_this,argsArray)
-		return defer.promise;
 	}
 
-	QClass.nfapply = function(f,args){
-		var _this = this === QClass ? null : this;
-		var defer = QClass.defer();
-		if(Object.prototype.toString.call(args) === '[object Array]'){
-			args.push(cbAdapter(defer));
-			f.apply(_this,args)
-		}else{
-			throw "args TypeError"
+
+	if(asbind("nfcall")){
+		QClass.nfcall = nfcall;
+	}
+
+	if(asbind("nfapply")){
+		QClass.nfapply = function(f,args){
+			var _this = this === QClass ? null : this;
+			var defer = QClass.defer();
+			if(isArray(args)){
+				args.push(cbAdapter(defer));
+				f.apply(_this,args)
+			}else{
+				throw "args TypeError"
+			}
+			return defer.promise;
 		}
-		return defer.promise;
 	}
 
 	QClass.denodeify = function(f){
 		var _this = this === QClass ? null : this;
 		return function(){
-			return QClass.nfapply.call(_this,f,Array.prototype.slice.call(arguments))
+			return nfcall.call(_this,f,arg2arr(arguments))
 		}
 	}
 	return QClass;
 }
 module.exports = extendClass;
-},{}],4:[function(require,module,exports){
+},{"./utils":5}],4:[function(require,module,exports){
 function extendPrototype(Promise){
 	var prototype = Promise.prototype;
 	prototype.done = function(ok,no){
@@ -292,7 +308,7 @@ function extendPrototype(Promise){
 	 * @param  {Function} fn      处理函数,拒绝值做为参数传入
 	 * @return {Promise}           
 	 */
-	Prototype.catchOf = function(errType,fn){
+	prototype.catchOf = function(errType,fn){
 		fn = fn || errType;
 		return this.then(null,function(err){
 			var futype = typeof fn;
@@ -329,4 +345,31 @@ function extendPrototype(Promise){
 	return Promise;
 }
 module.exports = extendPrototype;
+},{}],5:[function(require,module,exports){
+'use strict';
+exports.isPlainObject = function(obj) {
+	if (obj === null || typeof(obj) !== "object" || obj.nodeType || (obj === obj.window)) {
+		return false;
+	}
+	if (obj.constructor && !Object.prototype.hasOwnProperty.call(obj.constructor.prototype, "isPrototypeOf")) {
+		return false;
+	}
+	return true;
+}
+
+exports.isArray = function(obj){
+	return Object.prototype.toString.call(obj) == "[objece Array]"
+}
+
+exports.isFunction = function(obj){
+	return typeof obj == "function"
+}
+
+exports.isEmpty = function(obj){
+	return typeof obj == 'undefined' || obj === null;
+}
+
+exports.arg2arr = function(arg,b,s){
+	return Array.prototype.slice.call(arg,b,s);
+}
 },{}]},{},[1])
