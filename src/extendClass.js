@@ -35,11 +35,7 @@ function extendClass(Promise,obj,funnames){
 	if(!QClass.Promise && Promise != obj) QClass.Promise = Promise;
 
 	//defer
-	if(isFunction(Promise.defer)){
-		QClass.defer = Promise.defer
-	}else if(isFunction(Promise.deferred)){
-		QClass.defer = Promise.deferred
-	}else{
+	if(Promise.prototype.then){
 		QClass.defer = function() {
 			var resolve, reject;
 			var promise = new Promise(function(_resolve, _reject) {
@@ -52,13 +48,21 @@ function extendClass(Promise,obj,funnames){
 				reject: reject
 			};
 		}
+	}else if(isFunction(Promise.defer)){
+		QClass.defer = function(){return Promise.defer();}
+	}else if(isFunction(Promise.deferred)){
+		QClass.defer = function(){return Promise.deferred();}
+	}else{
+		throw new TypeError("此类不支持扩展!")
 	}
 
 	//delay
 	if(asbind("delay")){
 		QClass.delay = function(ms,value){
 			var defer = QClass.defer();
-			setTimeout(defer.resolve,ms,value)
+			setTimeout(function(){
+				defer.resolve(value);
+			},ms)
 			return defer.promise;
 		}
 	}
@@ -115,7 +119,7 @@ function extendClass(Promise,obj,funnames){
 					fillData(i);
 				}
 			}else{
-				defer.reject(new TypeError());
+				defer.reject(new TypeError("参数错误"));
 			}
 			return defer.promise;
 		}
@@ -235,7 +239,7 @@ function extendClass(Promise,obj,funnames){
 				args.push(cbAdapter(defer));
 				f.apply(_this,args)
 			}else{
-				throw "args TypeError"
+				throw TypeError('"args" is not Array')
 			}
 			return defer.promise;
 		}
