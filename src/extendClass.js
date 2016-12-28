@@ -35,7 +35,7 @@ function extendClass(Promise,obj,funnames){
 	if(!QClass.Promise && Promise != obj) QClass.Promise = Promise;
 
 	//defer
-	if(Promise.prototype.then){
+	if(isFunction(Promise) && isFunction(Promise.prototype.then)){
 		QClass.defer = function() {
 			var resolve, reject;
 			var promise = new Promise(function(_resolve, _reject) {
