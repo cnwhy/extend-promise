@@ -1,6 +1,6 @@
 {
   "name": "extend-promise",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "基于promise扩展一些常用方法",
   "main": "index.js",
   "scripts": {
