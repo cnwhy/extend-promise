@@ -5,6 +5,8 @@ var browserify = require("gulp-browserify");
 var uglify = require("gulp-uglify");
 var rename = require("gulp-rename");
 var header = require("gulp-header");
+var mocha = require("gulp-mocha");
+var istanbul = require("gulp-istanbul");
 
 var package = require("./package.json");
 var banner =
@@ -27,8 +29,21 @@ gulp.task('build',['test'],function(){
 		.pipe(gulp.dest('./dist'));
 })
 
+
+gulp.task('pre-test', function () {
+  return gulp.src(['src/**/*.js'])
+    // Covering files 
+    .pipe(istanbul())
+    // Force `require` to return covered files 
+    .pipe(istanbul.hookRequire());
+});
+
+//gulp.task('test',['pre-test'],function(){
 gulp.task('test',function(){
-	
+	return gulp.src('test/mocha_*.js', {read: false})
+		.pipe(mocha({reporter: 'dot'}))
+		// .pipe(istanbul.writeReports())
+		// .pipe(istanbul.enforceThresholds({ thresholds: { global: 90 } }));
 });
 
 gulp.task('default', ['build']);

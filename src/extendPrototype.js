@@ -5,12 +5,12 @@ function extendPrototype(Promise){
 			if(typeof ok == "function") setTimeout(function(){ok(value)},0);
 		},function(err){
 			if(typeof no == "function") setTimeout(function(){no(err)},0)
-			else throw err;
+			else setTimeout(function(){throw err;},0)
 		})
 	}
 	prototype.spread = function(ok,no){
 		return this.then(function(value){
-			return ok.apply(null,value);
+			return ok.apply(null,value); 
 		},no);
 	}
 	prototype.fail = 

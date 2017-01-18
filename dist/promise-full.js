@@ -1,5 +1,5 @@
 /*!
- * extend-promise v0.0.3
+ * extend-promise v0.0.6
  * Homepage https://github.com/cnwhy/extend-promise#readme
  * License BSD-2-Clause
  */
@@ -250,12 +250,8 @@ function extendClass(Promise,obj,funnames){
 
 	if(!QClass.Promise && Promise != obj) QClass.Promise = Promise;
 
-	//defer
-	if(isFunction(Promise.defer)){
-		QClass.defer = Promise.defer
-	}else if(isFunction(Promise.deferred)){
-		QClass.defer = Promise.deferred
-	}else{
+	//defer  defer为最基础的实现
+	if(isFunction(Promise) && isFunction(Promise.prototype.then)){
 		QClass.defer = function() {
 			var resolve, reject;
 			var promise = new Promise(function(_resolve, _reject) {
@@ -268,13 +264,22 @@ function extendClass(Promise,obj,funnames){
 				reject: reject
 			};
 		}
+	}else if(isFunction(Promise.defer)){
+		QClass.defer = function(){return Promise.defer();}
+	}else if(isFunction(Promise.deferred)){
+		QClass.defer = function(){return Promise.deferred();}
+	}else{
+		throw new TypeError("此类不支持扩展!")
 	}
 
 	//delay
 	if(asbind("delay")){
 		QClass.delay = function(ms,value){
 			var defer = QClass.defer();
-			setTimeout(defer.resolve,ms,value)
+			setTimeout(function(){
+				//console.log('==========')
+				defer.resolve(value);
+			},ms)
 			return defer.promise;
 		}
 	}
@@ -305,9 +310,13 @@ function extendClass(Promise,obj,funnames){
 			var defer = QClass.defer();
 			var data,_tempI = 0;
 			var fillData = function(i){
-				var _p = promises[i]
+				var _p = promises[i];
 				QClass.resolve(_p).then(function(d) {
-					data[i] = d;
+					if(typeof count != 'undefined'){
+						data.push(d);
+					}else{
+						data[i] = d;
+					}
 					if (--_tempI == 0 || (!map && count && data.length>=count)) {
 						defer.resolve(data);
 					}
@@ -322,16 +331,20 @@ function extendClass(Promise,obj,funnames){
 			}
 			if(isArray(promises)){
 				data = [];
+				if(promises.length == 0){defer.resolve(data)};
 				for(var i = 0; i<promises.length; i++){
 					fillData(i);
 				}
 			}else if(map && isPlainObject(promises)){
+				var _mark = 0;
 				data = {}
 				for(var i in promises){
 					fillData(i);
+					_mark++;
 				}
+				if(_mark == 0) defer.resolve(data)
 			}else{
-				defer.reject(new TypeError());
+				defer.reject(new TypeError("参数错误"));
 			}
 			return defer.promise;
 		}
@@ -348,7 +361,8 @@ function extendClass(Promise,obj,funnames){
 
 	if(asbind("some")){
 		QClass.some = function(proArr,count){
-			return getall(false,count||0)(proArr)
+			count = +count >= 0 ? +count : 0;
+			return getall(false,count)(proArr)
 		}
 	}
 
@@ -399,17 +413,15 @@ function extendClass(Promise,obj,funnames){
 	function race(proArr) {
 		var defer = QClass.defer();
 		for (var i = 0; i < proArr.length; i++) {
-			+ function() {
+			(function() {
 				var _i = i;
-				//nextTick(function() {
-					var _p = proArr[_i];
-					QClass.resolve(_p).then(function(data) {
-						defer.resolve(data);
-					}, function(err) {
-						defer.reject(err);
-					})
-				//}, 0)
-			}()
+				var _p = proArr[_i];
+				QClass.resolve(_p).then(function(data) {
+					defer.resolve(data);
+				}, function(err) {
+					defer.reject(err);
+				})
+			})()
 		}
 		return defer.promise;
 	}
@@ -436,6 +448,7 @@ function extendClass(Promise,obj,funnames){
 		var argsArray = arg2arr(arguments,1)
 		argsArray.push(cbAdapter(defer))
 		f.apply(_this,argsArray)
+		return defer.promise;
 	}
 
 
@@ -451,7 +464,7 @@ function extendClass(Promise,obj,funnames){
 				args.push(cbAdapter(defer));
 				f.apply(_this,args)
 			}else{
-				throw "args TypeError"
+				throw TypeError('"args" is not Array')
 			}
 			return defer.promise;
 		}
@@ -460,7 +473,7 @@ function extendClass(Promise,obj,funnames){
 	QClass.denodeify = function(f){
 		var _this = this === QClass ? null : this;
 		return function(){
-			return nfcall.call(_this,f,arg2arr(arguments))
+			return nfcall.apply(_this,[].concat([f],arg2arr(arguments)))
 		}
 	}
 	return QClass;
@@ -474,12 +487,12 @@ function extendPrototype(Promise){
 			if(typeof ok == "function") setTimeout(function(){ok(value)},0);
 		},function(err){
 			if(typeof no == "function") setTimeout(function(){no(err)},0)
-			else throw err;
+			else setTimeout(function(){throw err;},0)
 		})
 	}
 	prototype.spread = function(ok,no){
 		return this.then(function(value){
-			return ok.apply(null,value);
+			return ok.apply(null,value); 
 		},no);
 	}
 	prototype.fail = 
@@ -548,7 +561,7 @@ exports.isPlainObject = function(obj) {
 }
 
 exports.isArray = function(obj){
-	return Object.prototype.toString.call(obj) == "[objece Array]"
+	return Object.prototype.toString.call(obj) == "[object Array]"
 }
 
 exports.isFunction = function(obj){
