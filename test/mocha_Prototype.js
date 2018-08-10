@@ -1,5 +1,5 @@
 var assert = require("assert");
-var promise = Promise;//require('easy-promise');
+var promise = typeof Promise != 'undefined' ? Promise : require('easy-promise');
 var utils = require('../src/utils');
 var EP = require("../");
 var typeTest = require('./tutils.js');
