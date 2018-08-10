@@ -1,5 +1,5 @@
 /*!
- * extend-promise v0.0.6
+ * extend-promise v0.0.7
  * Homepage https://github.com/cnwhy/extend-promise#readme
  * License BSD-2-Clause
  */
@@ -20,7 +20,6 @@
 },{"../promise/setTimeout":4}],2:[function(require,module,exports){
 module.exports = require("./src")(function(fn){setTimeout(fn,0)});
 },{"./src":3}],3:[function(require,module,exports){
-"use strict";
 module.exports = function(nextTick){
 	var FUN = function(){};
 	function Resolve(promise, x) {
@@ -56,13 +55,6 @@ module.exports = function(nextTick){
 
 	function isPromise(obj){
 		return obj instanceof Promise_;
-	}
-
-	function bind(fun,self){
-		var arg = Array.prototype.slice.call(arguments,2);
-		return function(){
-			fun.apply(self,arg.concat(Array.prototype.slice.call(arguments)));
-		}
 	}
 
 	function Promise_(fun){
@@ -126,8 +118,25 @@ module.exports = function(nextTick){
 			no(err);
 		})
 	}
+	Promise_.all = function(arr){
+		if(Object.prototype.toString.call(arr) !== "[object Array]") throw new TypeError('The argument is not an array!')
+		return new Promise_(function(ok,no){
+			var result = [], _n = 0;
+			var count = arr.length;
+			var su = function(i){
+				return function(v){
+					result[i]=v;
+					if(++_n == count) ok(result);
+				}
+			}
+			if(count<=0) return ok([]);
+			for(var i =0; i < count; i++){
+				Promise_.resolve(arr[i]).then(su(i),no);
+			}
+		})
+	}
 
-	Promise.prototype.toString = function () {
+	Promise_.prototype.toString = function () {
 	    return "[object Promise]";
 	}
 
@@ -147,11 +156,19 @@ module.exports = function(nextTick){
 			else defer.reject(this.reason);
 		}
 
-		// this._events.push([ok,no,promise]);
-		// runThens.call(this)
 		return promise;
 	}
-
+	Promise_.prototype['catch'] = function(fn){
+		return this.then(null,fn);
+	}
+	Promise_.prototype['finally'] = function(fn){
+		if(typeof fn !== "function") return this;
+		return this.then(function(v){
+			return Promise_.resolve(fn()).then(function(){return v})
+		},function(err){
+			return Promise_.resolve(fn()).then(function(){throw err;})
+		});
+	}
 	function changeStatus(status,arg){
 		var self = this;
 		if(~this.status) return;
@@ -186,10 +203,7 @@ module.exports = function(nextTick){
 	function runThen(fn,arg,nextQ,status){
 		var resolve = nextQ.resolve
 			,reject = nextQ.reject
-		// if(nextQ){
-		// 	resolve = nextQ.resolve
-		// 	reject = nextQ.reject 
-		// }
+
 		if(typeof fn == 'function'){
 			nextTick(function(){
 				var nextPromise;
@@ -197,8 +211,6 @@ module.exports = function(nextTick){
 					nextPromise = fn(arg)
 				}catch(e){
 					reject(e)
-					// if(reject) 
-					// else throw e;
 					return;
 				}
 				resolve(nextPromise);
@@ -529,24 +541,22 @@ function extendPrototype(Promise){
 	 * @return {Promise}
 	 */
 	prototype.fin =
-	prototype['finally'] = function(fun){
-		var run = function(y,n){try{fun(y,n);}catch(e){}}
-		return this.then(function(data){
-			run(data);
-			return data;
+	prototype['finally'] = function(fn){
+		if(typeof fn !== "function") return this;
+		return this.then(function(v){
+			return Promise.resolve(fn()).then(function(){return v})
 		},function(err){
-			run(null,err);
-			throw err;
-		})
+			return Promise.resolve(fn()).then(function(){throw err;})
+		});
 	}
 	return Promise;
 }
 module.exports = extendPrototype;
 },{}],7:[function(require,module,exports){
 module.exports = function(Promise){
-	require("../src/extendClass")(Promise),
+	require("../src/extendClass")(Promise)
 	require("../src/extendPrototype")(Promise)
-	return(Promise)
+	return Promise;
 }
 },{"../src/extendClass":5,"../src/extendPrototype":6}],8:[function(require,module,exports){
 'use strict';

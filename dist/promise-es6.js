@@ -1,5 +1,5 @@
 /*!
- * extend-promise v0.0.6
+ * extend-promise v0.0.7
  * Homepage https://github.com/cnwhy/extend-promise#readme
  * License BSD-2-Clause
  */
@@ -338,24 +338,22 @@ function extendPrototype(Promise){
 	 * @return {Promise}
 	 */
 	prototype.fin =
-	prototype['finally'] = function(fun){
-		var run = function(y,n){try{fun(y,n);}catch(e){}}
-		return this.then(function(data){
-			run(data);
-			return data;
+	prototype['finally'] = function(fn){
+		if(typeof fn !== "function") return this;
+		return this.then(function(v){
+			return Promise.resolve(fn()).then(function(){return v})
 		},function(err){
-			run(null,err);
-			throw err;
-		})
+			return Promise.resolve(fn()).then(function(){throw err;})
+		});
 	}
 	return Promise;
 }
 module.exports = extendPrototype;
 },{}],4:[function(require,module,exports){
 module.exports = function(Promise){
-	require("../src/extendClass")(Promise),
+	require("../src/extendClass")(Promise)
 	require("../src/extendPrototype")(Promise)
-	return(Promise)
+	return Promise;
 }
 },{"../src/extendClass":2,"../src/extendPrototype":3}],5:[function(require,module,exports){
 'use strict';

@@ -1,6 +1,6 @@
 {
   "name": "extend-promise",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "基于promise扩展一些常用方法",
   "main": "index.js",
   "scripts": {
@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/cnwhy/extend-promise#readme",
   "devDependencies": {
-    "easy-promise": "0.0.3",
+    "easy-promise": "^0.1.0",
     "gulp": "^3.9.1",
     "gulp-browserify": "^0.5.1",
     "gulp-header": "^1.8.8",
@@ -33,6 +33,5 @@
     "gulp-uglify": "^2.0.0",
     "istanbul": "^0.4.5",
     "mocha": "^3.2.0"
-  },
-  "dependencies": {}
+  }
 }
